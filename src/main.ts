@@ -125,29 +125,21 @@ export default class CustomSortPlugin extends Plugin {
 			this.saveSettings()
 		}
 
-		// --- USER REQUESTED HARDCODED BEHAVIOR ---
-		this.settings.suspended = false; // Force plugin active
+		// --- HARDCODED BEHAVIOR: /pages folders only toggle ---
+		// parseSortSpecFromText expects the VALUE of sorting-spec key (not full YAML).
+		// Pass spec lines directly — no YAML wrapper needed.
 		const mode = this.settings.pagesMode || 0;
-		const yamlSpec = mode === 0 ? 
-`---
-sorting-spec: |
-  target-folder: /pages
-  /folders
-  > modified
----` :
-`---
-sorting-spec: |
-  target-folder: /pages
-  /folders
-  > a-z
----`;
+		const specLines = mode === 0
+			? ['target-folder: /pages', '/folders', '> modified']
+			: ['target-folder: /pages', '/folders', '> a-z'];
 
 		this.sortSpecCache = processor.parseSortSpecFromText(
-			yamlSpec.split('\\n'),
-			'/', 
-			'hack.md', 
-			this.sortSpecCache
-		) || this.sortSpecCache;
+			specLines,
+			'/',
+			'sortspec.md',
+			null  // always fresh, ignore any sortspec.md on disk
+		) ?? null;
+		this.settings.suspended = false;
 		this.saveSettings();
 		// ----------------------------------------
 	}
