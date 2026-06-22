@@ -132,11 +132,13 @@ export default class CustomSortPlugin extends Plugin {
 `---
 sorting-spec: |
   target-folder: /pages
+  /folders
   > modified
 ---` :
 `---
 sorting-spec: |
   target-folder: /pages
+  /folders
   > a-z
 ---`;
 
