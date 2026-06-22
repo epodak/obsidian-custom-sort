@@ -30,6 +30,7 @@ import {
 interface CustomSortPluginSettings {
 	additionalSortspecFile: string
 	suspended: boolean
+	pagesMode?: number
 	statusBarEntryEnabled: boolean
 	notificationsEnabled: boolean
 }
@@ -37,6 +38,7 @@ interface CustomSortPluginSettings {
 const DEFAULT_SETTINGS: CustomSortPluginSettings = {
 	additionalSortspecFile: '',
 	suspended: true,  // if false by default, it would be hard to handle the auto-parse after plugin install
+	pagesMode: 0,
 	statusBarEntryEnabled: true,
 	notificationsEnabled: true
 }
@@ -119,10 +121,33 @@ export default class CustomSortPlugin extends Plugin {
 			} else {
 				errorMessage = `No custom sorting specification found or only empty specification(s)`
 			}
-			this.showNotice(`Parsing custom sorting specification FAILED. Suspending the plugin.\n${errorMessage}`, ERROR_NOTICE_TIMEOUT)
 			this.settings.suspended = true
 			this.saveSettings()
 		}
+
+		// --- USER REQUESTED HARDCODED BEHAVIOR ---
+		this.settings.suspended = false; // Force plugin active
+		const mode = this.settings.pagesMode || 0;
+		const yamlSpec = mode === 0 ? 
+`---
+sorting-spec: |
+  target-folder: /pages
+  > modified
+---` :
+`---
+sorting-spec: |
+  target-folder: /pages
+  > a-z
+---`;
+
+		this.sortSpecCache = processor.parseSortSpecFromText(
+			yamlSpec.split('\\n'),
+			'/', 
+			'hack.md', 
+			this.sortSpecCache
+		) || this.sortSpecCache;
+		this.saveSettings();
+		// ----------------------------------------
 	}
 
 	checkFileExplorerIsAvailableAndPatchable(logWarning: boolean = true): FileExplorerView | undefined {
@@ -162,14 +187,14 @@ export default class CustomSortPlugin extends Plugin {
 		this.saveSettings()
 		let iconToSet: string
 		if (this.settings.suspended) {
-			this.showNotice('Custom sort OFF');
+			this.showNotice(`Custom sort OFF (${this.settings.pagesMode === 0 ? '> modified' : '> a-z'})`);
 			this.sortSpecCache = null
 			iconToSet = ICON_SORT_SUSPENDED
 		} else {
 			this.readAndParseSortingSpec();
 			if (this.sortSpecCache) {
 				if (fileExplorerView) {
-					this.showNotice('Custom sort ON');
+					this.showNotice(`Custom sort ON (${this.settings.pagesMode === 0 ? '> modified' : '> a-z'})`);
 					this.initialAutoOrManualSortingTriggered = true
 					iconToSet = ICON_SORT_ENABLED_ACTIVE
 				} else {
@@ -222,9 +247,10 @@ export default class CustomSortPlugin extends Plugin {
 		// Create an icon button in the left ribbon.
 		this.ribbonIconEl = this.addRibbonIcon(
 			this.settings.suspended ? ICON_SORT_SUSPENDED : ICON_SORT_ENABLED_NOT_APPLIED,
-			'Toggle custom sorting', (evt: MouseEvent) => {
-				// Clicking the icon toggles between the states of custom sort plugin
-				this.switchPluginStateTo(this.settings.suspended)
+			'Toggle pages sorting mode (modified vs a-z)', (evt: MouseEvent) => {
+				this.settings.pagesMode = (this.settings.pagesMode === 1 ? 0 : 1);
+				this.settings.suspended = false;
+				this.switchPluginStateTo(true)
 			});
 
 		if (!this.settings.suspended) {
